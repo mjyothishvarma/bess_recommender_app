@@ -1,9 +1,10 @@
 import streamlit as st
-import os
 import re
+import pandas as pd
 from model import load_dataset, prepare_user_vector
 from db import save_feedback
 from fpdf import FPDF
+import io
 
 # -------------------------------
 # 🔐 Basic Validation Functions
@@ -188,56 +189,53 @@ if st.session_state.get("show_recs", False):
         )
         st.success("✅ Feedback submitted successfully!")
 
-    def generate_pdf(user_name, user_email, cleaned_input, recs, user_feedback, global_comment):
+   
+    def generate_pdf(user_name, user_email, input_data, recs, feedback, comment):
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", size=12)
 
-        pdf.cell(200, 10, txt="BESS Recommendation Report", ln=True, align='C')
-        pdf.ln(5)
-        pdf.cell(200, 10, txt=f"User: {user_name} | Email: {user_email}", ln=True)
-
+        pdf.cell(200, 10, txt="Battery Energy Storage System (BESS) Report", ln=True, align="C")
         pdf.ln(10)
-        pdf.set_font("Arial", 'B', 12)
-        pdf.cell(200, 10, txt="User Inputs", ln=True)
-        pdf.set_font("Arial", size=11)
-        for k, v in cleaned_input.items():
-            pdf.cell(200, 8, txt=f"{k}: {v}", ln=True)
 
+        pdf.cell(200, 10, txt=f"Name: {user_name}", ln=True)
+        pdf.cell(200, 10, txt=f"Email: {user_email}", ln=True)
         pdf.ln(10)
-        pdf.set_font("Arial", 'B', 12)
-        pdf.cell(200, 10, txt="Top Recommendations", ln=True)
 
-        rec_number = 0
-        for i, (index, row) in enumerate(recs.iterrows()):
-            rec_number += 1
-            feedback = next((f for f in user_feedback if f["index"] == index), {})
-            pdf.set_font("Arial", 'B', 11)
-            pdf.cell(200, 10, txt=f"Recommendation {rec_number} (Similarity: {round(row['similarity'], 2)})", ln=True)
-            pdf.set_font("Arial", size=10)
-            for col in row.index:
-                if col != "similarity":
-                    pdf.cell(200, 7, txt=f"{col}: {row[col]}", ln=True)
-            if feedback:
-                pdf.cell(200, 7, txt=f"Rating: {feedback.get('rating')} | Comment: {feedback.get('comment')}", ln=True)
-            pdf.ln(5)
+        pdf.cell(200, 10, txt="Input Specifications:", ln=True)
+        for key, value in input_data.items():
+            pdf.cell(200, 10, txt=f"{key}: {value}", ln=True)
+        pdf.ln(10)
 
-        pdf.set_font("Arial", 'B', 12)
-        pdf.cell(200, 10, txt="Additional Comments", ln=True)
-        pdf.set_font("Arial", size=11)
-        pdf.multi_cell(0, 8, global_comment or "N/A")
+        pdf.cell(200, 10, txt="Recommendations:", ln=True)
+        for key, value in recs.items():  # 🔁 Use .items() instead of enumerate()
+            pdf.cell(200, 10, txt=f"{key}: {value}", ln=True)
+        pdf.ln(10)
 
-        output_path = "/mnt/data/bess_report.pdf"
-        pdf.output(output_path)
-        return output_path
+        pdf.cell(200, 10, txt="User Feedback:", ln=True)
+        for i, f in enumerate(feedback, 1):
+            pdf.cell(200, 10, txt=f"{i}. {f}", ln=True)
+        pdf.ln(10)
 
-    # After feedback is submitted
-    pdf_path = generate_pdf(user_name, user_email, cleaned_input, recs, user_feedback, global_comment)
-    with open(pdf_path, "rb") as f:
-        st.download_button(
-            label="📄 Download PDF Report",
-            data=f,
-            file_name="bess_report.pdf",
-            mime="application/pdf"
-        )
+        pdf.cell(200, 10, txt="Overall Comment:", ln=True)
+        pdf.multi_cell(0, 10, txt=comment)
+
+        # Save to BytesIO
+        pdf_buffer = io.BytesIO()
+        pdf_bytes = pdf.output(dest='S').encode('latin1')
+        pdf_buffer.write(pdf_bytes)
+        pdf_buffer.seek(0)
+
+        return pdf_buffer
+
+    pdf_file = generate_pdf(user_name, user_email, cleaned_input, recs, user_feedback, global_comment)
+
+    st.download_button(
+        label="📄 Download Report as PDF",
+        data=pdf_file,
+        file_name="bess_report.pdf",
+        mime="application/pdf"
+    )
+    
+
 
