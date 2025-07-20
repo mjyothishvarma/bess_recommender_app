@@ -5,8 +5,8 @@ def get_db():
     password = st.secrets["mongodb"]["password"]
     cluster = st.secrets["mongodb"]["cluster"]
 
-    uri = f"mongodb+srv://{username}:{password}@{cluster}/?retryWrites=true&w=majority"
-    client = MongoClient(uri)
+    # uri = f"mongodb+srv://{username}:{password}@{cluster}/?retryWrites=true&w=majority"
+    client = MongoClient("mongodb://localhost:27017/")
     print("Atlas Connection successful")
     return client["bess_recommender"]["user_feedback"]
 
