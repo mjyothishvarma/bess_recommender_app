@@ -21,9 +21,23 @@ def prepare_user_vector(df, basic_input, expert_input):
 
     scaler = MinMaxScaler()
     df_scaled = scaler.fit_transform(df_subset)
-    user_scaled = scaler.transform(user_vector)
+    user_df = pd.DataFrame(user_vector, columns=df_subset.columns)
+    user_scaled = scaler.transform(user_df)
 
-    similarities = cosine_similarity(user_scaled, df_scaled)[0]
+    # Define weights (increase weight for 'C-rate' and 'Capacity')
+    weights = np.ones(df_scaled.shape[1])
+    feature_names = df_subset.columns
+
+    for i, feature in enumerate(feature_names):
+        if feature.lower() in ['C-Rate', 'Capacity']:
+            weights[i] = 10.0  # You can adjust this weight
+
+    # Apply weights
+    df_scaled_weighted = df_scaled * weights
+    user_scaled_weighted = user_scaled * weights
+
+    # Compute similarity
+    similarities = cosine_similarity(user_scaled_weighted, df_scaled_weighted)[0]
     top_indices = np.argsort(similarities)[::-1][:10]
     top_recommendations = df.iloc[top_indices].copy()
     top_recommendations['similarity'] = similarities[top_indices]
