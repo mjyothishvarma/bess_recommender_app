@@ -28,7 +28,7 @@ unit_map = {
     'Battery Size' : 'KWh',
     'Energy Density': 'Wh/kg',
     'DOD': '%',
-    'Impedance': 'MΩ',
+    'Impedance': 'Mohm',
     'Nominal Voltage': 'V',
     'Nominal Current': 'mA',
     'Weight': 'kg',
@@ -91,7 +91,7 @@ st.sidebar.header("🧠 Expert Inputs")
 expert_inputs = {
     'Energy Density': st.sidebar.number_input("Energy Density (Wh/kg)", value=150.0),
     'DOD': st.sidebar.number_input("Depth of Discharge (%)", value=80.0),
-    'Impedance': st.sidebar.number_input("Impedance (MΩ)", value=0.02),
+    'Impedance': st.sidebar.number_input("Impedance (Mohm)", value=0.02),
     'Nominal Voltage': st.sidebar.number_input("Nominal Voltage (V)", value=3.7),
     'Nominal Current': st.sidebar.number_input("Nominal Current (mA)", value=2000.0),
     'Weight': st.sidebar.number_input("Weight (kg)", value=2500.0),
@@ -190,43 +190,73 @@ if st.session_state.get("show_recs", False):
         st.success("✅ Feedback submitted successfully!")
 
    
-    def generate_pdf(user_name, user_email, input_data, recs, feedback, comment):
+    def generate_pdf(user_name, user_email, input_data, recs_df, feedback_list, global_comment):
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", size=12)
 
+        # Title
+        pdf.set_font("Arial", 'B', size=14)
         pdf.cell(200, 10, txt="Battery Energy Storage System (BESS) Report", ln=True, align="C")
         pdf.ln(10)
 
+        # User Info
+        pdf.set_font("Arial", size=12)
         pdf.cell(200, 10, txt=f"Name: {user_name}", ln=True)
         pdf.cell(200, 10, txt=f"Email: {user_email}", ln=True)
         pdf.ln(10)
 
+        # Input Specifications
+        pdf.set_font("Arial", 'B', 12)
         pdf.cell(200, 10, txt="Input Specifications:", ln=True)
+        pdf.set_font("Arial", size=12)
         for key, value in input_data.items():
-            pdf.cell(200, 10, txt=f"{key}: {value}", ln=True)
+            unit = unit_map.get(key, "")
+            pdf.cell(200, 10, txt=f"{key}: {value} {unit}", ln=True)
         pdf.ln(10)
 
-        pdf.cell(200, 10, txt="Recommendations:", ln=True)
-        for key, value in recs.items():  # 🔁 Use .items() instead of enumerate()
-            pdf.cell(200, 10, txt=f"{key}: {value}", ln=True)
-        pdf.ln(10)
+        # Recommendations (All Fields)
+        pdf.set_font("Arial", 'B', 12)
+        pdf.cell(200, 10, txt="Top Recommendations:", ln=True)
+        pdf.set_font("Arial", size=12)
+        rec_number = 0
+        for i, row in recs_df.iterrows():
+            rec_number += 1
+            pdf.cell(200, 10, txt=f"Recommendation #{rec_number} (Similarity: {round(row['similarity'], 2)})", ln=True)
 
+            for field in row.index:
+                val = row.get(field, 'N/A')
+                unit = unit_map.get(field, "")
+                pdf.cell(200, 10, txt=f"{field}: {val} {unit}", ln=True)
+            pdf.ln(5)
+
+        # User Feedback
+        pdf.ln(5)
+        pdf.set_font("Arial", 'B', 12)
         pdf.cell(200, 10, txt="User Feedback:", ln=True)
-        for i, f in enumerate(feedback, 1):
-            pdf.cell(200, 10, txt=f"{i}. {f}", ln=True)
-        pdf.ln(10)
+        pdf.set_font("Arial", size=12)
+        for idx, fb in enumerate(feedback_list, 1):
+            pdf.cell(200, 10, txt=f"{idx}. Recommendation #{fb['index']+1}", ln=True)
+            pdf.cell(200, 10, txt=f"   Similarity: {fb['similarity']}", ln=True)
+            pdf.cell(200, 10, txt=f"   Rating: {fb['rating']}", ln=True)
+            pdf.multi_cell(0, 10, txt=f"   Comment: {fb['comment'] if fb['comment'] else 'N/A'}")
+            pdf.ln(3)
 
+        # Global Comment
+        pdf.ln(5)
+        pdf.set_font("Arial", 'B', 12)
         pdf.cell(200, 10, txt="Overall Comment:", ln=True)
-        pdf.multi_cell(0, 10, txt=comment)
+        pdf.set_font("Arial", size=12)
+        pdf.multi_cell(0, 10, txt=global_comment if global_comment else "N/A")
 
         # Save to BytesIO
         pdf_buffer = io.BytesIO()
         pdf_bytes = pdf.output(dest='S').encode('latin1')
         pdf_buffer.write(pdf_bytes)
         pdf_buffer.seek(0)
-
         return pdf_buffer
+
+
 
     pdf_file = generate_pdf(user_name, user_email, cleaned_input, recs, user_feedback, global_comment)
 
